@@ -12,7 +12,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cpu")
 # single gpu
 trainer = Trainer(
-    env_type="pytorchDDP",
+    # env_type="pytorchDDP",
+    env_type="deepspeed+mpu",
     experiment_name="roberta_seq2seq",
     batch_size=1,
     gradient_accumulation_steps=1,
@@ -31,7 +32,8 @@ trainer = Trainer(
     num_nodes=1,
     num_gpus=2,
     checkpoint_activations=False,
-    model_parallel_size=1,
+    # model_parallel_size=1,
+    model_parallel_size=2,
     hostfile='./hostfile',
     deepspeed_config='./deepspeed.json',
     training_script=__file__,
@@ -44,9 +46,9 @@ os.makedirs(model_dir, exist_ok=True)
 maxlen = 256
 
 auto_loader = AutoLoader(
-    "seq2seq",
-    model_name="GPT2-base-ch",
-    model_dir=model_dir,
+    "lm",
+    model_name="opt-125m-en", #opt-6.7b-en，opt-13b-en，opt-30b-en
+    model_dir=model_dir
 )
 model = auto_loader.get_model()
 tokenizer = auto_loader.get_tokenizer()
@@ -134,7 +136,7 @@ optimizer = torch.optim.Adam(model.parameters(),
                              weight_decay=1e-5)
 trainer.train(model,
               train_dataset=train_dataset,
-              valid_dataset=val_dataset,
+            #   valid_dataset=val_dataset,
               collate_fn=GPT2Seq2seqDataset.collate_fn,
               optimizer=optimizer,
               )
