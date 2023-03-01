@@ -4,7 +4,7 @@
   "steps_per_print": 50,
   "gradient_clipping": 1.0,
   "zero_optimization": {
-    "stage": 0,
+    "stage": 2,
     "contiguous_gradients": false,
     "overlap_comm": true,
     "reduce_scatter": true,
@@ -14,8 +14,8 @@
   },
   "zero_allow_untested_optimizer": true,
   "fp16": {
-    "enabled": true,
-    "loss_scale": 4096,
+    "enabled": false,
+    "loss_scale": 0,
     "loss_scale_window": 1000,
     "hysteresis": 2,
     "min_loss_scale": 1
@@ -33,7 +33,7 @@
     }
   },
   "activation_checkpointing": {
-    "partition_activations": false,
+    "partition_activations": true,
     "contiguous_memory_optimization": false
   },
   "wall_clock_breakdown": false,

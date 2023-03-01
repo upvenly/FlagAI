@@ -9,13 +9,23 @@ from flagai.auto_model.auto_loader import AutoLoader
 from flagai.trainer import Trainer
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+try:
+    os.environ.pop('KUBERNETES_PORT')
+except KeyError:
+    pass
+
 # device = torch.device("cpu")
 # single gpu
+
+batch_size = int(os.getenv("BS", 1))#6.7b，4/8, #125M 32 
+num_nodes = int(os.getenv("NODE", 1))
+num_gpus = int(os.getenv("GPU_NUM", 2))
+model_parallel_size = int(os.getenv("MP", 2))
+
 trainer = Trainer(
-    # env_type="pytorchDDP",
-    env_type="deepspeed+mpu",
+    env_type=os.getenv("ET", "deepspeed+mpu"),
     experiment_name="roberta_seq2seq",
-    batch_size=32,#6.7b，4/8, #125M 32 
+    batch_size=batch_size, 
     gradient_accumulation_steps=1,
     lr=2e-4,
     weight_decay=1e-3,
@@ -29,15 +39,44 @@ trainer = Trainer(
     num_checkpoints=1,
     master_ip='127.0.0.1',
     master_port=17750,
-    num_nodes=1,
-    num_gpus=2,
-    checkpoint_activations=True,
-    model_parallel_size=1,
-    # model_parallel_size=2,
+    num_nodes=num_nodes,
+    num_gpus=num_gpus,
+    checkpoint_activations=False,
+    # model_parallel_size=1,
+    model_parallel_size=model_parallel_size,
     hostfile='./hostfile',
     deepspeed_config='./deepspeed.json',
     training_script=__file__,
 )
+
+# trainer = Trainer(
+#     # env_type="pytorchDDP",
+#     env_type="deepspeed+mpu",
+#     experiment_name="roberta_seq2seq",
+#     batch_size=1,#6.7b，4/8, #125M 32 
+#     gradient_accumulation_steps=1,
+#     lr=2e-4,
+#     weight_decay=1e-3,
+#     epochs=10,
+#     log_interval=10,
+#     eval_interval=10000,
+#     load_dir=None,
+#     pytorch_device=device,
+#     save_dir="checkpoints",
+#     save_interval=1,
+#     num_checkpoints=1,
+#     master_ip='127.0.0.1',
+#     master_port=17750,
+#     num_nodes=1,
+#     num_gpus=2,
+#     checkpoint_activations=False,
+#     # model_parallel_size=1,
+#     model_parallel_size=2,
+#     hostfile='./hostfile',
+#     deepspeed_config='./deepspeed.json',
+#     training_script=__file__,
+# )
+
 cur_dir = os.path.dirname(os.path.abspath(__file__))
 src_dir = cur_dir + '/data/train.src'
 tgt_dir = cur_dir + '/data/train.tgt'
@@ -47,7 +86,8 @@ maxlen = 256
 
 auto_loader = AutoLoader(
     "lm",
-    model_name="opt-125m-en", #opt-6.7b-en，opt-13b-en，opt-30b-en
+    # model_name="opt-125m-en", #opt-6.7b-en，opt-13b-en，opt-30b-en
+    model_name=os.getenv("MN", "opt-125m-en"), #opt-6.7b-en，opt-13b-en，opt-30b-en
     model_dir=model_dir
 )
 model = auto_loader.get_model()
