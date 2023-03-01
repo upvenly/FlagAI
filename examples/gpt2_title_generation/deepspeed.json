@@ -4,7 +4,7 @@
   "steps_per_print": 50,
   "gradient_clipping": 1.0,
   "zero_optimization": {
-    "stage": 1,
+    "stage": 2,
     "contiguous_gradients": false,
     "overlap_comm": true,
     "reduce_scatter": true,
@@ -14,7 +14,7 @@
   },
   "zero_allow_untested_optimizer": true,
   "fp16": {
-    "enabled": true,
+    "enabled": false,
     "loss_scale": 0,
     "loss_scale_window": 1000,
     "hysteresis": 2,

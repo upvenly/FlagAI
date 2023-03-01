@@ -22,6 +22,8 @@ import torch
 import argparse
 import os
 import random
+import time
+from numpy import *
 import numpy as np
 import torch.distributed as dist
 from flagai.logger import log_dist
@@ -159,7 +161,14 @@ class Trainer():
         deepspeed_config=None,
         model_parallel_size=1,
         training_script="train.py",
-    ):
+        ):
+
+        s = "Trainer Init para: env_type:{} | batch_size: {} ｜ num_nodes: {} | num_gpus: {} | model_parallel_size: {}".format(
+            env_type, batch_size, num_nodes, num_gpus, model_parallel_size)
+        
+        log_dist(s, [0])
+
+        self.global_batch_size = batch_size * num_gpus / model_parallel_size * gradient_accumulation_steps
 
         if timers is not None:
             self.timers = timers
@@ -523,6 +532,8 @@ class Trainer():
         best_score = float('inf')
         if len(self.metric_methods) > 0:
             best_score = -best_score
+
+        time_list = []
         for epoch in range(self.epochs):
             print("epoch "+str(epoch))
             if self.env_type != 'pytorch':
@@ -578,6 +589,7 @@ class Trainer():
                     else:
                         avg_lm_loss = total_lm_loss.item() / self.log_interval
                     elapsed_time = self.timers('interval time').elapsed()
+                    time_list.append(elapsed_time / self.log_interval)
                     self.report_iteration_metrics(
                         optimizer, learning_rate, avg_lm_loss,
                         elapsed_time * 1000.0 / self.log_interval,
@@ -638,6 +650,8 @@ class Trainer():
                 self.iteration += 1
                 # Checkpointing at the end of each epoch.
 
+        samples_per_sec = self.global_batch_size / mean(time_list)
+        self.report_data(self.env_type, samples_per_sec)
         # Evaluation #todo add train_args
         if ((self.epochs == 0) or (self.eval_interval and
                                    (self.iteration ) % self.eval_interval != 0)
@@ -649,6 +663,7 @@ class Trainer():
                 model=model,
                 forward_step_func=self.forward_step,
                 verbose=False)
+
 
     def train_step_pytorch(self,
                            data,
@@ -1065,6 +1080,24 @@ class Trainer():
             metric_dct.update({metric_name: metrics[i]})
         metric_dct.update({"loss": all_losses})
         return metric_dct
+
+
+    def report_data(self, env_type, samples_per_sec):
+        """Simple GPU memory report."""
+        mega_bytes = 1024.0 * 1024.0
+        string = 'env_type: {}｜ '.format(env_type)
+        string += 'samples per sec: {} | '.format(samples_per_sec)
+        string += 'memory (MB)'
+        string += ' | allocated: {}'.format(
+            torch.cuda.memory_allocated() / mega_bytes)
+        string += ' | max allocated: {}'.format(
+            torch.cuda.max_memory_allocated() / mega_bytes)
+        string += ' | reserved: {}'.format(
+            torch.cuda.memory_reserved() / mega_bytes)
+        string += ' | max reserved: {}'.format(
+            torch.cuda.max_memory_reserved() / mega_bytes)
+        log_dist(string, [0])
+        
 
     def report_iteration_metrics(self, optimizer, lr, loss, elapsed_time, step,
                                  total_step):
